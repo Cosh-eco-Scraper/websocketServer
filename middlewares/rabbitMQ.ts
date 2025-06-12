@@ -1,13 +1,14 @@
 import amqp from 'amqplib';
+import 'dotenv/config';
 
 export const variables = {
   queue: 'scraper_updates',
-  connectionUrl: "amqps://qxpngojo:ZzIYQTgUDylWoHp_5iHbTEa4c_X3VZl1@seal.lmq.cloudamqp.com/qxpngojo",
+  connectionUrl: process.env.RABBIT_CONNECTION_URL || ''
 };
 
 export async function receiveMessages(onMessage?: (msg: string) => void) {
   try {
-    const connection = await amqp.connect(process.env.RABBIT_CONNECTION_URL || variables.connectionUrl);
+    const connection = await amqp.connect(variables.connectionUrl);
     const channel = await connection.createChannel();
 
     await channel.assertQueue(variables.queue, { durable: true });

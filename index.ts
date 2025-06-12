@@ -23,4 +23,4 @@ RabbitMQMiddleware.receiveMessages((msg: string) => {
     broadcastToClients(msg);
 });
 
-console.log(`WebSocket server running on port ${PORT}`);
+console.log(`WebSocket running on port ${PORT}`);
