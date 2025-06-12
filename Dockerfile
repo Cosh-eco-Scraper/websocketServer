@@ -1,51 +1,49 @@
-# --- Build Stage ---
-# Uses a Node.js image with build tools. Alpine is chosen for its smaller size.
+# Use a smaller, production-ready Node.js image for the build stage
 FROM node:20-alpine AS build
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json first to leverage Docker's build cache.
-# This way, if only source code changes, npm install won't re-run.
 COPY package.json package-lock.json ./
 
-# Install all dependencies (including devDependencies like TypeScript and ts-node)
-# These are necessary for the 'npm run build' step.
+# Install all dependencies (dev and prod) for the build process
+# We need dev dependencies like 'typescript' here.
 RUN npm install
 
-# Copy the rest of your application code (TypeScript source files, etc.)
+# --- ADD THIS LINE HERE ---
+# Ensure executables in node_modules/.bin have execute permissions
+RUN chmod +x ./node_modules/.bin/*
+
+# Copy the rest of the application code to the container.
 COPY . .
 
 # Run your build command. This will compile your TypeScript files into JavaScript
 # and place them in the 'dist' directory, as specified in your package.json.
 RUN npm run build
 
-# Prune development dependencies from node_modules.
-# This makes the node_modules directory much smaller for the final production image.
-RUN npm prune --production
-
 # --- Production Stage ---
-# Uses a lean Node.js runtime image for the final production environment.
+# Use the same small Node.js image for the final production image
 FROM node:20-alpine AS production
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy only the absolutely essential files from the 'build' stage to the 'production' stage:
-# 1. The pruned node_modules: Contains only production dependencies.
-# 2. package.json: Needed for 'npm start' command.
-# 3. The compiled 'dist' directory: Your ready-to-run JavaScript code.
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./package.json
+# Copy package.json and package-lock.json for production dependency installation
+COPY package.json package-lock.json ./
+
+# Install production dependencies only. This creates the node_modules directory
+# for the final image, which is smaller.
+RUN npm install --production
+
+# If you have a build step (e.g., Babel, TypeScript), copy the compiled output:
 COPY --from=build /app/dist ./dist
 
-# Expose the port your WebSocket server listens on.
+# Expose the port your WebSocket server listens on
 EXPOSE 3002
 
-# Set the Node.js environment variable to production.
-# This enables optimizations and production-specific behavior in many libraries.
+# Set the Node.js environment variable to production
 ENV NODE_ENV=production
 
 # Command to start your application in production.
-# This assumes your package.json has a 'start' script like "start": "node dist/index.js".
+# This typically runs a 'start' script defined in your package.json.
 CMD ["npm", "start"]
