@@ -7,9 +7,9 @@ import RabbitMQMiddleware from './middlewares/rabbitMQ.js';
 // Add some logs for debugging startup
 console.log("Application starting up...");
 console.log(`Attempting to use WS_PORT: ${process.env.WS_PORT}`);
-console.log(`Attempting to connect to RabbitMQ using URL: ${process.env.RABBITMQ_URL ? 'set' : 'NOT SET'}`); // Check if RabbitMQ URL is set
+console.log(`Attempting to connect to RabbitMQ using URL: ${process.env.RABBIT_CONNECTION_URL ? 'set' : 'NOT SET'}`); // Check if RabbitMQ URL is set
 
-const PORT = process.env.WS_PORT || 3002;
+const PORT = process.env.WS_PORT || 3002;r
 const wss = new WebSocketServer({ port: Number(PORT) });
 
 const clients = new Set<WebSocket>();
