@@ -1,23 +1,37 @@
-# Use the official Node.js image as the base image
-FROM node:20
+# Use a smaller, production-ready Node.js image for the build stage
+FROM node:20-alpine AS build
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json to the container
+
 COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm install
+# Install production dependencies only. This creates the node_modules directory.
+RUN npm install --production
 
-# Copy the rest of the application code to the container
+# Copy the rest of the application code to the container.
+# This assumes your source code is in the root of your project.
 COPY . .
 
-# Expose the WebSocket server port
+# --- Production Stage ---
+# Use the same small Node.js image for the final production image
+FROM node:20-alpine AS production
+
+# Set the working directory inside the container
+WORKDIR /app
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+# If you have a build step (e.g., Babel, TypeScript), copy the compiled output:
+COPY --from=build /app/dist ./dist
+
+# Expose the port your WebSocket server listens on
 EXPOSE 3002
 
-# Set environment variables (optional, or use a .env file)
+# Set the Node.js environment variable to production
 ENV NODE_ENV=production
 
-# Start the application using the "dev" script
-CMD ["npm", "run", "dev"]
+# Command to start your application in production.
+# This typically runs a 'start' script defined in your package.json.
+CMD ["npm", "start"]
