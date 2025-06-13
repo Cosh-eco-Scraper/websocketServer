@@ -12,29 +12,62 @@ console.log(`Attempting to connect to RabbitMQ using URL: ${process.env.RABBIT_C
 const PORT = process.env.WS_PORT || 3002; // <-- REMOVE THE EXTRA 'r' HERE
 const wss = new WebSocketServer({ port: Number(PORT) });
 
-const clients = new Set<WebSocket>();
+const clients = new Map<string, WebSocket>();
 
 wss.on('connection', (ws) => {
-    clients.add(ws);
-    ws.on('close', () => clients.delete(ws));
-    console.log("New WebSocket client connected.");
+  console.log('New client connected.');
+
+  ws.on('message', (msg) => {
+    try {
+      const parsed = JSON.parse(msg.toString());
+
+      if (parsed.type === 'register' && parsed.clientId) {
+        clients.set(parsed.clientId, ws);
+        console.log(`Client registered with ID: ${parsed.clientId}`);
+      }
+    } catch (err) {
+      console.error('Error parsing client message:', err);
+    }
+  });
+
+  ws.on('close', () => {
+    for (const [id, client] of clients.entries()) {
+      if (client === ws) {
+        clients.delete(id);
+        console.log(`Client with ID ${id} disconnected.`);
+        break;
+      }
+    }
+  });
 });
 
 function broadcastToClients(message: string) {
-    for (const client of clients) {
-        if (client.readyState === client.OPEN) {
-            client.send(message);
-        }
+  for (const [, client] of clients) { // Destructure to get the WebSocket
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
     }
+  }
 }
+
 
 // Add a try-catch around the RabbitMQ initialization if possible,
 // especially if RabbitMQMiddleware itself doesn't handle fatal connection errors.
 try {
-    RabbitMQMiddleware.receiveMessages((msg: string) => {
-        console.log("Received message from RabbitMQ:", msg);
-        broadcastToClients(msg);
-    });
+RabbitMQMiddleware.receiveMessages((msg: string) => {
+  console.log("Received message from RabbitMQ:", msg);
+  try {
+    const parsed = JSON.parse(msg); // expects { target: 'webX', content: 'your message here' }
+
+    const client = clients.get(parsed.target);
+if (client && client.readyState === WebSocket.OPEN) {
+  client.send(parsed.content); // Send as plain string
+} else {
+  console.warn(`Client not found or not open: ${parsed.target}`);
+}
+  } catch (err) {
+    console.error('Error handling RabbitMQ message:', err);
+  }
+});
     console.log("RabbitMQ message reception initialized.");
 } catch (error) {
     console.error("ERROR: Failed to initialize RabbitMQ message reception:", error);
